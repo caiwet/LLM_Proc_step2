@@ -1,0 +1,6 @@
+step2_gemini_output/
+step2_processed_output/
+*.csv
+*.parquet
+*.json
+*.jsonl
