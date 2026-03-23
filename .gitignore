@@ -1,6 +1,14 @@
-step2_gemini_output/
+step2_gemini_output*/
 step2_processed_output/
 *.csv
 *.parquet
 *.json
 *.jsonl
+*.txt
+sft_out*/
+results*/
+shard*
+benchmark
+*/logs/
+annotation_tool/data
+annotation_tool/annotations

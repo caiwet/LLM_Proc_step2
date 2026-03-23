@@ -8,6 +8,8 @@ from typing import Optional
 
 import torch
 from datasets import load_from_disk, load_dataset
+from datasets import Features, Sequence, Value
+
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -16,6 +18,32 @@ from transformers import (
     TrainingArguments,
     DataCollatorForLanguageModeling,
 )
+
+@dataclass
+class DataCollatorForCausalLMWithPrecomputedLabels:
+    tokenizer: any
+    label_pad_token_id: int = -100
+
+    def __call__(self, features):
+        # split labels from other fields
+        labels = [f["labels"] for f in features]
+        inputs = [{k: v for k, v in f.items() if k != "labels"} for f in features]
+
+        # pad model inputs
+        batch = self.tokenizer.pad(
+            inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+        max_len = batch["input_ids"].shape[1]
+
+        # pad labels to max_len
+        padded_labels = []
+        for lab in labels:
+            padded_labels.append(lab + [self.label_pad_token_id] * (max_len - len(lab)))
+
+        batch["labels"] = torch.tensor(padded_labels, dtype=torch.long)
+        return batch
 
 
 @dataclass
@@ -126,8 +154,9 @@ def train(data_config: DataConfig, training_config: TrainingConfig) -> None:
         data_config.model_name,
         torch_dtype=torch.bfloat16 if training_config.bf16 else torch.float32,
         attn_implementation="flash_attention_2",
+        # attn_implementation="sdpa",
         trust_remote_code=True,
-        use_cache=False,
+        # use_cache=False,
     )
 
     print(f"Loading tokenizer: {data_config.model_name}")
@@ -150,7 +179,20 @@ def train(data_config: DataConfig, training_config: TrainingConfig) -> None:
     if data_config.dataset_path.endswith('.arrow') or Path(data_config.dataset_path).is_dir():
         train_dataset = load_from_disk(data_config.dataset_path)
     else:
-        train_dataset = load_dataset("parquet", data_files=data_config.dataset_path, split="train")
+        # train_dataset = load_dataset("parquet", data_files=data_config.dataset_path, split="train")
+        features = Features({
+            "input_ids": Sequence(Value("int32")),
+            "attention_mask": Sequence(Value("int8")),
+            "labels": Sequence(Value("int64")),  # matches your metadata
+        })
+
+        train_dataset = load_dataset(
+            "parquet",
+            data_files=data_config.dataset_path,
+            split="train",
+            features=features,
+        )
+
     
     print(f"Loaded {len(train_dataset)} training examples")
     print(f"Dataset columns: {train_dataset.column_names}")
@@ -161,7 +203,19 @@ def train(data_config: DataConfig, training_config: TrainingConfig) -> None:
         if data_config.eval_dataset_path.endswith('.arrow') or Path(data_config.eval_dataset_path).is_dir():
             eval_dataset = load_from_disk(data_config.eval_dataset_path)
         else:
-            eval_dataset = load_dataset("parquet", data_files=data_config.eval_dataset_path, split="train")
+            features = Features({
+                "input_ids": Sequence(Value("int32")),
+                "attention_mask": Sequence(Value("int8")),
+                "labels": Sequence(Value("int64")),  # matches your metadata
+            })
+
+            eval_dataset = load_dataset(
+                "parquet",
+                data_files=data_config.eval_dataset_path,
+                split="train",
+                features=features,
+            )
+            # eval_dataset = load_dataset("parquet", data_files=data_config.eval_dataset_path, split="train")
         print(f"Loaded {len(eval_dataset)} eval examples")
 
     # Training arguments
@@ -193,10 +247,12 @@ def train(data_config: DataConfig, training_config: TrainingConfig) -> None:
     )
 
     # Data collator (handles padding only, labels already created)
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer,
-        mlm=False,
-    )
+    # data_collator = DataCollatorForLanguageModeling(
+    #     tokenizer=tokenizer,
+    #     mlm=False,
+    # )
+    
+    data_collator = DataCollatorForCausalLMWithPrecomputedLabels(tokenizer)
 
     # Initialize trainer
     trainer = Trainer(

@@ -8,15 +8,15 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 import torch
 import sys
-sys.path.append('/data/bwh-comppath-img2/MGH_CID/6-llm/2-multi-stage-pipeline')  # Add project root to path
-from step2_prompt import SYSTEM_PROMPT 
+# sys.path.append('/data/bwh-comppath-img2/MGH_CID/6-llm/2-multi-stage-pipeline')  # Add project root to path
+# from step2_prompt import SYSTEM_PROMPT 
 
 def preprocess_dataset(
     input_path: str,
     output_path: str,
     model_name: str,
     max_seq_length: int,
-    system_prompt: str,
+    # system_prompt: str,
     input_field: str = "input",
     output_field: str = "output",
 ):
@@ -53,13 +53,13 @@ def preprocess_dataset(
         if tokenizer.chat_template is not None:
             if "qwen" in model_name.lower() or "lfm" in model_name.lower():
                 messages = [
-                    {"role": "system", "content": system_prompt},
+                    # {"role": "system", "content": system_prompt},
                     {"role": "user", "content": input_text},
                     {"role": "assistant", "content": output_text}
                 ]
             elif "gemma" in model_name.lower():
                 messages = [
-                    {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
+                    # {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
                     {"role": "user", "content": [{"type": "text", "text": input_text}]},
                     {"role": "assistant", "content": [{"type": "text", "text": output_text}]}
                 ]
@@ -169,5 +169,5 @@ if __name__ == "__main__":
         max_seq_length=args.max_seq_length,
         input_field=args.input_field,
         output_field=args.output_field,
-        system_prompt=SYSTEM_PROMPT
+        # system_prompt=SYSTEM_PROMPT
     )

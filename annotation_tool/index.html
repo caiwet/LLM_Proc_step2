@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ClinicalAnnotate — Concept Review Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:          #F7F4EE;
+  --surface:     #FDFCF8;
+  --surface2:    #F0EDE5;
+  --border:      #DDD8CC;
+  --border2:     #C8C2B4;
+  --text:        #1C1A17;
+  --text-muted:  #7A7468;
+  --text-light:  #AEA89E;
+  --teal:        #1A5C5A;
+  --teal-light:  #E8F4F3;
+  --teal-mid:    #2E7D7B;
+  --amber:       #C07C2A;
+  --amber-light: #FDF3E7;
+  --red:         #B83B3B;
+  --red-light:   #FAEAEA;
+  --green:       #2E7A42;
+  --green-light: #E8F5EC;
+  --blue:        #2B5BA8;
+  --blue-light:  #EBF1FC;
+  --radius:      6px;
+  --radius-lg:   12px;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,.06);
+  --shadow:      0 4px 16px rgba(0,0,0,.08);
+  --shadow-lg:   0 12px 40px rgba(0,0,0,.12);
+  --transition:  all .15s ease;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+/* ── TOPBAR ── */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 52px; background: var(--teal);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px; box-shadow: 0 2px 12px rgba(0,0,0,.18);
+}
+.logo { font-family: 'Instrument Serif', serif; font-size: 1.2rem; color: #fff; letter-spacing: -.3px; white-space: nowrap; }
+.logo span { font-style: italic; opacity: .65; }
+.topbar-div { width: 1px; height: 22px; background: rgba(255,255,255,.2); flex-shrink: 0; }
+#file-select-wrap { display: flex; align-items: center; gap: 8px; }
+#file-select-wrap label { color: rgba(255,255,255,.65); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+select {
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; border-radius: var(--radius); padding: 5px 10px;
+  font-size: .83rem; font-family: inherit; cursor: pointer; outline: none;
+  transition: var(--transition); max-width: 260px;
+}
+select:hover { background: rgba(255,255,255,.2); }
+select option { background: #1A5C5A; }
+#top-progress { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,.8); font-size: .78rem; }
+#top-progress-bar-wrap { width: 90px; height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; }
+#top-progress-bar { height: 100%; background: var(--amber); border-radius: 2px; transition: width .4s ease; width: 0%; }
+#topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 13px; border-radius: var(--radius);
+  font-size: .8rem; font-weight: 500; font-family: inherit;
+  cursor: pointer; border: none; transition: var(--transition); white-space: nowrap;
+}
+.btn-ghost { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2); }
+.btn-ghost:hover { background: rgba(255,255,255,.22); }
+.btn-primary { background: var(--amber); color: #fff; }
+.btn-primary:hover { background: #d08930; }
+.btn-sm { padding: 4px 10px; font-size: .76rem; }
+
+/* ── FILE TABS ── */
+#file-nav {
+  position: fixed; top: 52px; left: 0; right: 0; z-index: 90;
+  height: 38px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; overflow-x: auto; padding: 0 12px;
+}
+#file-nav::-webkit-scrollbar { height: 3px; }
+.file-tab {
+  padding: 0 14px; height: 38px; display: flex; align-items: center;
+  font-size: .79rem; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; color: var(--text-muted);
+  transition: var(--transition); gap: 6px; flex-shrink: 0;
+}
+.file-tab:hover { color: var(--text); }
+.file-tab.active { color: var(--teal); border-bottom-color: var(--teal); font-weight: 600; }
+.tab-badge { font-size: .63rem; padding: 1px 5px; border-radius: 8px; background: var(--surface2); color: var(--text-muted); }
+.file-tab.active .tab-badge { background: var(--teal-light); color: var(--teal); }
+
+/* ── TWO-PANEL LAYOUT ── */
+#app { display: flex; padding-top: 90px; height: 100vh; }
+
+/* LEFT panel */
+#note-panel {
+  width: 42%; min-width: 300px; max-width: 580px;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+}
+#note-panel-header {
+  padding: 12px 16px 10px; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+}
+#note-panel-header-top { display: flex; align-items: center; justify-content: space-between; }
+#note-panel-header h3 { font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 600; }
+#note-id-tag { font-family: 'IBM Plex Mono', monospace; font-size: .73rem; color: var(--teal); background: var(--teal-light); padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+
+#note-search-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#note-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-size: .82rem;
+  font-family: inherit;
+  outline: none;
+  transition: var(--transition);
+}
+
+#note-search-input:focus {
+  border-color: var(--teal-mid);
+  box-shadow: 0 0 0 2px rgba(26,92,90,.1);
+}
+
+/* Note text */
+#note-text-scroll { flex: 1; overflow-y: auto; padding: 16px 18px; }
+#note-text { font-size: .91rem; line-height: 1.95; color: var(--text); font-family: 'DM Sans', sans-serif; white-space: pre-wrap; word-break: break-word; }
+
+.note-search-hit {
+  background: #FFF3A3;
+  color: var(--text);
+  border-radius: 3px;
+  padding: 1px 2px;
+}
+
+.note-search-hit.active {
+  background: #FFD54F;
+  outline: 1px solid #C07C2A;
+}
+
+/* RIGHT panel */
+#right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+#right-header {
+  padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap;
+}
+#right-header h2 { font-size: .9rem; font-weight: 600; }
+#row-count-badge { font-size: .72rem; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
+#filter-wrap { display: flex; gap: 5px; margin-left: auto; flex-wrap: wrap; }
+.filter-btn {
+  padding: 4px 10px; border-radius: 12px; font-size: .73rem;
+  font-family: inherit; cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted); transition: var(--transition);
+}
+.filter-btn:hover { border-color: var(--teal-mid); color: var(--teal); }
+.filter-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+#cards-scroll { flex: 1; overflow-y: auto; padding: 14px 18px; }
+
+/* Row cards */
+.row-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); margin-bottom: 9px;
+  box-shadow: var(--shadow-sm); overflow: hidden; transition: box-shadow .2s, border-color .2s;
+}
+.row-card:hover { box-shadow: var(--shadow); }
+.row-card.annotated-ok     { border-left: 3px solid var(--green); }
+.row-card.annotated-issues { border-left: 3px solid var(--amber); }
+.row-card.flash            { box-shadow: 0 0 0 2px var(--teal-mid), var(--shadow); }
+
+.row-card-header {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 13px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid transparent; transition: background .12s;
+}
+.row-card-header:hover { background: var(--surface2); }
+.row-card.expanded .row-card-header { border-bottom-color: var(--border); }
+
+.row-num { font-family: 'IBM Plex Mono', monospace; font-size: .67rem; color: var(--text-light); background: var(--surface2); padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+.row-type-badge { font-size: .71rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+.row-summary { flex: 1; font-size: .79rem; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.row-status-icon { flex-shrink: 0; font-size: .9rem; }
+.chevron { color: var(--text-light); transition: transform .2s; flex-shrink: 0; font-size: .72rem; }
+.row-card.expanded .chevron { transform: rotate(90deg); }
+
+.row-card-body { display: none; }
+.row-card.expanded .row-card-body { display: block; }
+
+.field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px; background: var(--border); }
+.field-section-header { grid-column: 1/-1; background: var(--surface2); padding: 5px 12px; font-size: .63rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 600; }
+.field-cell { background: var(--surface); padding: 9px 11px; transition: background .12s; }
+.field-cell:hover { background: var(--surface2); }
+.field-cell.empty-cell { opacity: .5; }
+.field-label { font-family: 'IBM Plex Mono', monospace; font-size: .63rem; color: var(--text-muted); margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
+.field-value { font-size: .81rem; font-weight: 500; word-break: break-word; line-height: 1.4; min-height: 15px; }
+.field-value.empty-val { color: var(--text-light); font-style: italic; font-weight: 400; font-size: .76rem; }
+
+.field-saved-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-left: 3px; }
+.field-saved-dot.ok      { background: var(--green); }
+.field-saved-dot.issue   { background: var(--amber); }
+.field-saved-dot.skipped { background: var(--blue); }
+.field-saved-dot.unsaved { background: transparent; }
+
+.field-annotation { margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 5px; }
+.ann-vote-row { display: flex; gap: 5px; }
+.ann-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: 12px; font-size: .71rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-muted); transition: var(--transition);
+}
+.ann-btn.correct.active   { background: var(--green-light); color: var(--green); border-color: var(--green); }
+.ann-btn.incorrect.active { background: var(--red-light); color: var(--red); border-color: var(--red); }
+.ann-btn.skip.active      { background: var(--blue-light); color: var(--blue); border-color: var(--blue); }
+
+.ann-correction-wrap { display: none; }
+.ann-correction-wrap.visible { display: flex; flex-direction: column; gap: 4px; }
+.ann-correction-label { font-size: .66rem; color: var(--text-muted); }
+.ann-correction-input, .ann-comment-input {
+  width: 100%; padding: 4px 7px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: .77rem; font-family: 'IBM Plex Mono', monospace;
+  background: var(--bg); color: var(--text); outline: none; transition: var(--transition);
+}
+.ann-correction-input:focus, .ann-comment-input:focus { border-color: var(--teal-mid); box-shadow: 0 0 0 2px rgba(26,92,90,.1); }
+
+.row-quick-actions { display: flex; gap: 7px; padding: 8px 13px; background: var(--surface2); border-top: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+.row-quick-label { font-size: .71rem; color: var(--text-muted); }
+.save-indicator { margin-left: auto; font-size: .71rem; color: var(--green); opacity: 0; transition: opacity .3s; }
+.save-indicator.show { opacity: 1; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; gap: 12px; color: var(--text-muted); text-align: center; padding: 30px; }
+.empty-state .icon { font-size: 2.5rem; opacity: .35; }
+.empty-state h3 { font-size: .95rem; color: var(--text); }
+.empty-state p { font-size: .83rem; max-width: 300px; line-height: 1.6; }
+.spinner { width: 26px; height: 26px; border: 3px solid var(--border); border-top-color: var(--teal); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#toast-container { position: fixed; bottom: 18px; right: 18px; z-index: 999; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.toast { padding: 9px 15px; border-radius: var(--radius); font-size: .8rem; font-weight: 500; box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 7px; animation: slideUp .2s ease; pointer-events: auto; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } }
+.toast-success { background: var(--green); color: #fff; }
+.toast-error   { background: var(--red); color: #fff; }
+.toast-info    { background: var(--teal); color: #fff; }
+
+#shortcut-modal { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.4); backdrop-filter: blur(3px); align-items: center; justify-content: center; }
+#shortcut-modal.open { display: flex; }
+.modal-box { background: var(--surface); border-radius: var(--radius-lg); padding: 24px; max-width: 380px; width: 90%; box-shadow: var(--shadow-lg); }
+.modal-box h3 { font-size: .93rem; margin-bottom: 14px; }
+.shortcut-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
+.shortcut-row:last-child { border: none; }
+kbd { font-family: 'IBM Plex Mono', monospace; font-size: .7rem; background: var(--surface2); border: 1px solid var(--border2); padding: 2px 6px; border-radius: 4px; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">Clinical<span>Annotate</span></div>
+  <div class="topbar-div"></div>
+  <div id="file-select-wrap">
+    <label>Dataset</label>
+    <select id="file-select"><option value="">— choose file —</option></select>
+  </div>
+  <div class="topbar-div"></div>
+  <div id="top-progress" style="display:none">
+    <span id="progress-text">0 / 0</span>
+    <div id="top-progress-bar-wrap"><div id="top-progress-bar"></div></div>
+  </div>
+  <div id="topbar-right">
+    <button class="btn btn-ghost btn-sm" onclick="openShortcuts()">⌨ Shortcuts</button>
+    <button class="btn btn-primary btn-sm" onclick="exportAnnotations()">↓ Export</button>
+  </div>
+</div>
+
+<div id="file-nav"></div>
+
+<div id="app">
+
+  <!-- LEFT: clinical note -->
+  <div id="note-panel">
+    <div id="note-panel-header">
+      <div id="note-panel-header-top">
+        <h3>Clinical Note</h3>
+        <span id="note-id-tag">—</span>
+      </div>
+      <div id="note-search-wrap">
+        <input
+          id="note-search-input"
+          type="text"
+          placeholder="Search note text..."
+          autocomplete="off"
+        />
+        <button id="note-search-clear" class="btn btn-sm" type="button">Clear</button>
+      </div>
+    </div>
+    <div id="note-text-scroll">
+      <div id="note-text">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>Select a file to view the clinical note</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: annotation cards -->
+  <div id="right-panel">
+    <div id="right-header">
+      <h2 id="section-title">Extracted Concepts</h2>
+      <span id="row-count-badge">—</span>
+      <div id="filter-wrap">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter(this)">All</button>
+        <button class="filter-btn" data-filter="unannotated" onclick="setFilter(this)">Unannotated</button>
+        <button class="filter-btn" data-filter="issues" onclick="setFilter(this)">Has Issues</button>
+        <button class="filter-btn" data-filter="done" onclick="setFilter(this)">Done</button>
+      </div>
+    </div>
+    <div id="cards-scroll">
+      <div class="empty-state" id="empty-main">
+        <div class="icon">🏥</div>
+        <h3>No file loaded</h3>
+        <p>Drop your <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">.parquet</code> + <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">.txt</code> files in <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">data/</code> and select above.</p>
+      </div>
+      <div id="row-cards-container"></div>
+    </div>
+  </div>
+</div>
+
+<div id="shortcut-modal">
+  <div class="modal-box">
+    <h3>⌨ Keyboard Shortcuts</h3>
+    <div class="shortcut-row"><span>Next file</span><kbd>→</kbd></div>
+    <div class="shortcut-row"><span>Previous file</span><kbd>←</kbd></div>
+    <div class="shortcut-row"><span>Next search match</span><kbd>Enter</kbd></div>
+    <div class="shortcut-row"><span>Export CSV</span><kbd>Ctrl+E</kbd></div>
+    <div class="shortcut-row"><span>Close</span><kbd>Esc</kbd></div>
+    <br>
+    <button class="btn btn-primary" style="width:100%" onclick="closeShortcuts()">Got it</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CATEGORY CONFIG — 13 clinical categories
+// ═══════════════════════════════════════════
+const CATEGORIES = {
+  Encounter:       { color: '#6366F1', bg: '#EEF2FF' },
+  Lab:             { color: '#0891B2', bg: '#ECFEFF' },
+  Vital:           { color: '#0D9488', bg: '#F0FDFA' },
+  Symptom:         { color: '#DC2626', bg: '#FEF2F2' },
+  Diagnosis:       { color: '#9333EA', bg: '#FAF5FF' },
+  Medication:      { color: '#EA580C', bg: '#FFF7ED' },
+  Procedure:       { color: '#2563EB', bg: '#EFF6FF' },
+  Immunization:    { color: '#16A34A', bg: '#F0FDF4' },
+  Allergy:         { color: '#E11D48', bg: '#FFF1F2' },
+  Device:          { color: '#7C3AED', bg: '#F5F3FF' },
+  FamilyHistory:   { color: '#B45309', bg: '#FFFBEB' },
+  SocialHistory:   { color: '#047857', bg: '#ECFDF5' },
+  PersonalHistory: { color: '#0369A1', bg: '#F0F9FF' },
+};
+
+function catStyle(type) {
+  return CATEGORIES[type] || { color: '#64748B', bg: '#F1F5F9' };
+}
+
+const FIELD_GROUPS = {
+  'Core':       ['resourceType','id','status','description','timestamp'],
+  'Location':   ['body_site','laterality'],
+  'Value':      ['valueQuantity_value','valueQuantity_unit','valueString'],
+  'Medication': ['ingredient_text','ingredient_strength_numerator_value','ingredient_strength_numerator_unit',
+                 'ingredient_strength_denominator_value','ingredient_strength_denominator_unit',
+                 'dosageInstruction_text','dosageInstruction_value','dosageInstruction_unit'],
+  'Timing':     ['timing_frequency','timing_period','timing_period_unit'],
+  'Other':      ['schedule_info','relationship','resource_index'],
+};
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const state = {
+  files: [], currentFile: null,
+  columns: [], currentNoteId: null, rows: [], noteText: '',
+  annotations: {}, progress: {},
+  filter: 'all',
+  noteSearch: '',
+  noteSearchMatches: [],
+  activeNoteSearchIndex: -1,
+};
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+async function init() {
+  await loadFileList();
+  await loadProgress();
+
+  document.getElementById('file-select').addEventListener('change', e => {
+    if (e.target.value) loadFile(e.target.value);
+  });
+
+  const noteSearchInput = document.getElementById('note-search-input');
+  const noteSearchClear = document.getElementById('note-search-clear');
+
+  noteSearchInput.addEventListener('input', e => {
+    state.noteSearch = e.target.value || '';
+    renderNoteText();
+  });
+
+  noteSearchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      jumpToNextSearchMatch();
+    }
+  });
+
+  noteSearchClear.addEventListener('click', () => {
+    state.noteSearch = '';
+    state.noteSearchMatches = [];
+    state.activeNoteSearchIndex = -1;
+    noteSearchInput.value = '';
+    renderNoteText();
+  });
+}
+
+// ═══════════════════════════════════════════
+//  FILE LIST + TABS
+// ═══════════════════════════════════════════
+async function loadFileList() {
+  try {
+    const d = await fetch('/api/files').then(r => r.json());
+    state.files = d.files || [];
+    const sel = document.getElementById('file-select');
+    state.files.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.name;
+      o.textContent = f.has_note ? `📄 ${f.name}` : f.name;
+      sel.appendChild(o);
+    });
+    renderFileTabs();
+    if (state.files.length === 1) { sel.value = state.files[0].name; loadFile(state.files[0].name); }
+  } catch(e) { toast('Cannot connect to backend', 'error'); }
+}
+
+function renderFileTabs() {
+  const nav = document.getElementById('file-nav');
+  nav.innerHTML = '';
+  state.files.forEach(f => {
+    const tab = document.createElement('div');
+    tab.className = 'file-tab' + (f.name === state.currentFile ? ' active' : '');
+    tab.dataset.file = f.name;
+    const stem = f.name.replace(/\.[^.]+$/, '');
+    const prog = state.progress[stem] || {};
+    tab.innerHTML = `${f.name}${prog.annotated_rows ? `<span class="tab-badge">${prog.annotated_rows}</span>` : ''}`;
+    tab.onclick = () => { document.getElementById('file-select').value = f.name; loadFile(f.name); };
+    nav.appendChild(tab);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  LOAD FILE
+// ═══════════════════════════════════════════
+async function loadFile(filename) {
+  state.currentFile = filename;
+  document.querySelectorAll('.file-tab').forEach(t => t.classList.toggle('active', t.dataset.file === filename));
+  document.getElementById('empty-main').style.display = 'none';
+  document.getElementById('row-cards-container').innerHTML =
+    '<div style="display:flex;justify-content:center;padding:40px"><div class="spinner"></div></div>';
+
+  try {
+    const d = await fetch(`/api/data/${encodeURIComponent(filename)}`).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+
+    state.columns = d.columns;
+    state.currentNoteId = d.note_ids[0];
+    state.rows = d.groups[state.currentNoteId].rows;
+    state.noteText = d.groups[state.currentNoteId].note_text || '';
+
+    document.getElementById('note-id-tag').textContent = state.currentNoteId;
+
+    const ann = await fetch(`/api/annotations/${encodeURIComponent(state.currentNoteId)}`).then(r => r.json());
+    state.annotations[state.currentNoteId] = ann;
+
+    state.noteSearchMatches = [];
+    state.activeNoteSearchIndex = -1;
+
+    renderNoteText();
+    renderRows();
+    updateProgressBar();
+  } catch(e) { toast('Failed to load file', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+//  NOTE TEXT — plain text + search highlighting only
+// ═══════════════════════════════════════════
+function renderNoteText() {
+  const el = document.getElementById('note-text');
+
+  if (!state.noteText) {
+    el.innerHTML = '<span style="color:var(--text-muted);font-style:italic;font-size:.85rem">No .txt file found — add a matching text file to data/</span>';
+    return;
+  }
+
+  const query = (state.noteSearch || '').trim();
+  state.noteSearchMatches = [];
+  state.activeNoteSearchIndex = -1;
+
+  if (!query) {
+    el.innerHTML = escHtml(state.noteText);
+    return;
+  }
+
+  const escapedText = escHtml(state.noteText);
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escapedQuery, 'gi');
+
+  let matchIndex = 0;
+  el.innerHTML = escapedText.replace(regex, match => {
+    const cls = matchIndex === 0 ? 'note-search-hit active' : 'note-search-hit';
+    const html = `<mark class="${cls}" data-note-match-index="${matchIndex}">${match}</mark>`;
+    matchIndex += 1;
+    return html;
+  });
+
+  state.noteSearchMatches = Array.from(el.querySelectorAll('.note-search-hit'));
+
+  if (state.noteSearchMatches.length > 0) {
+    state.activeNoteSearchIndex = 0;
+    scrollActiveSearchMatchIntoView();
+  }
+}
+
+function jumpToNextSearchMatch() {
+  if (!state.noteSearchMatches.length) return;
+
+  state.activeNoteSearchIndex =
+    (state.activeNoteSearchIndex + 1) % state.noteSearchMatches.length;
+
+  updateActiveSearchMatch();
+  scrollActiveSearchMatchIntoView();
+}
+
+function updateActiveSearchMatch() {
+  state.noteSearchMatches.forEach((node, idx) => {
+    node.classList.toggle('active', idx === state.activeNoteSearchIndex);
+  });
+}
+
+function scrollActiveSearchMatchIntoView() {
+  const active = state.noteSearchMatches[state.activeNoteSearchIndex];
+  if (!active) return;
+
+  active.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+    inline: 'nearest'
+  });
+}
+
+// ═══════════════════════════════════════════
+//  RENDER CARDS
+// ═══════════════════════════════════════════
+function setFilter(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); state.filter = btn.dataset.filter; renderRows();
+}
+
+function renderRows() {
+  const container = document.getElementById('row-cards-container');
+  container.innerHTML = '';
+  const nid = state.currentNoteId;
+  const anns = state.annotations[nid] || {};
+
+  document.getElementById('section-title').textContent = nid || 'Extracted Concepts';
+  document.getElementById('row-count-badge').textContent = `${state.rows.length} row${state.rows.length !== 1 ? 's' : ''}`;
+
+  let rows = state.rows.map((row, idx) => ({ row, idx }));
+  if (state.filter !== 'all') {
+    rows = rows.filter(({ row, idx }) => {
+      const ra = anns[rowKey(row, idx)];
+      if (state.filter === 'unannotated') return !ra || !isRowAnnotated(ra);
+      if (state.filter === 'done')        return ra && isRowAnnotated(ra);
+      if (state.filter === 'issues')      return ra && hasIssues(ra);
+      return true;
+    });
+  }
+
+  if (rows.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No rows match this filter.</p></div>';
+    return;
+  }
+  rows.forEach(({ row, idx }) => {
+    const rk = rowKey(row, idx);
+    container.appendChild(buildRowCard(row, idx, rk, anns[rk] || {}, nid));
+  });
+}
+
+function rowKey(row, idx) { return (row.id && row.id !== 'nan') ? `row_${row.id}` : `row_${idx}`; }
+function isRowAnnotated(ra) { return Object.values(ra).some(v => v && typeof v === 'object' && 'correct' in v); }
+function hasIssues(ra) { return Object.values(ra).some(v => v && typeof v === 'object' && v.correct === false); }
+
+// ═══════════════════════════════════════════
+//  BUILD ROW CARD
+// ═══════════════════════════════════════════
+function buildRowCard(row, idx, rk, ra, nid) {
+  const rt = (row.resourceType || 'Unknown').trim();
+  const { color, bg } = catStyle(rt);
+  const cardCls = hasIssues(ra) ? 'annotated-issues' : isRowAnnotated(ra) ? 'annotated-ok' : '';
+  const icon = hasIssues(ra) ? '⚠️' : isRowAnnotated(ra) ? '✅' : '';
+  const summary = ['description','status','body_site'].map(k => row[k]).filter(v => v && v !== 'nan').join(' · ');
+
+  const card = document.createElement('div');
+  card.className = `row-card ${cardCls}`; card.id = `card-${rk}`;
+  card.innerHTML = `
+    <div class="row-card-header" onclick="toggleCard('${rk}')">
+      <span class="row-num">#${idx+1}</span>
+      <span class="row-type-badge" style="background:${bg};color:${color}">${rt}</span>
+      <span class="row-summary">${escHtml(summary || row.id || '—')}</span>
+      <span class="row-status-icon">${icon}</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="row-card-body">
+      <div class="field-grid" id="grid-${rk}"></div>
+      <div class="row-quick-actions">
+        <span class="row-quick-label">Mark all:</span>
+        <button class="btn btn-sm" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="markAllFields('${nid}','${rk}',true)">✓ All Correct</button>
+        <button class="btn btn-sm" style="background:var(--red-light);color:var(--red);border:1px solid var(--red)" onclick="markAllFields('${nid}','${rk}',false)">✗ Flag Issues</button>
+        <span class="save-indicator" id="saved-${rk}">✓ Saved</span>
+      </div>
+    </div>`;
+  setTimeout(() => buildFieldGrid(card.querySelector(`#grid-${rk}`), row, rk, ra, nid), 0);
+  return card;
+}
+
+function toggleCard(rk) { document.getElementById(`card-${rk}`)?.classList.toggle('expanded'); }
+
+// ═══════════════════════════════════════════
+//  FIELD GRID
+// ═══════════════════════════════════════════
+function buildFieldGrid(grid, row, rk, ra, nid) {
+  if (!grid) return;
+  const colToGroup = {};
+  Object.entries(FIELD_GROUPS).forEach(([g, cols]) => cols.forEach(c => colToGroup[c] = g));
+  const displayCols = state.columns.filter(c => c !== 'note_id');
+  displayCols.forEach(c => { if (!colToGroup[c]) colToGroup[c] = 'Other'; });
+  const groupOrder = Object.keys(FIELD_GROUPS);
+  const sorted = [...displayCols].sort((a, b) => {
+    const gi = v => { const i = groupOrder.indexOf(colToGroup[v]); return i === -1 ? 99 : i; };
+    return gi(a) - gi(b);
+  });
+
+  let lastGroup = null;
+  sorted.forEach(col => {
+    const grp = colToGroup[col];
+    if (grp !== lastGroup) {
+      const h = document.createElement('div');
+      h.className = 'field-section-header'; h.textContent = grp;
+      grid.appendChild(h); lastGroup = grp;
+    }
+    const val = row[col];
+    const isEmpty = !val || val === '' || val === 'nan';
+    const fa = ra[col] || {};
+    const dotCls = fa.correct === true ? 'ok' : fa.correct === false ? 'issue' : fa.correct === 'skip' ? 'skipped' : 'unsaved';
+
+    const cell = document.createElement('div');
+    cell.className = `field-cell${isEmpty ? ' empty-cell' : ''}`; cell.id = `cell-${rk}-${col}`;
+    cell.innerHTML = `
+      <div class="field-label">${col}<span class="field-saved-dot ${dotCls}" id="dot-${rk}-${col}"></span></div>
+      <div class="field-value ${isEmpty ? 'empty-val' : ''}">${isEmpty ? 'empty' : escHtml(String(val))}</div>
+      <div class="field-annotation">
+        <div class="ann-vote-row">
+          <button class="ann-btn correct ${fa.correct===true?'active':''}" onclick="annotateField('${nid}','${rk}','${col}',true,this)">✓ Correct</button>
+          <button class="ann-btn incorrect ${fa.correct===false?'active':''}" onclick="annotateField('${nid}','${rk}','${col}',false,this)">✗ Wrong</button>
+          <button class="ann-btn skip ${fa.correct==='skip'?'active':''}" onclick="annotateField('${nid}','${rk}','${col}','skip',this)">? Unsure</button>
+        </div>
+        <div class="ann-correction-wrap ${fa.correct===false?'visible':''}" id="corr-${rk}-${col}">
+          <div class="ann-correction-label">Corrected value</div>
+          <input class="ann-correction-input" placeholder="Enter correct value…" value="${escHtml(fa.corrected_value||'')}" onchange="saveCorrectedValue('${nid}','${rk}','${col}',this.value)"/>
+          <div class="ann-correction-label">Comment</div>
+          <input class="ann-comment-input" placeholder="Optional note…" value="${escHtml(fa.comment||'')}" onchange="saveComment('${nid}','${rk}','${col}',this.value)"/>
+        </div>
+      </div>`;
+    grid.appendChild(cell);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  ANNOTATION LOGIC
+// ═══════════════════════════════════════════
+function annotateField(nid, rk, col, verdict, btn) {
+  if (!state.annotations[nid]) state.annotations[nid] = {};
+  if (!state.annotations[nid][rk]) state.annotations[nid][rk] = {};
+  const ex = state.annotations[nid][rk][col] || {};
+
+  if (ex.correct === verdict) {
+    delete state.annotations[nid][rk][col];
+    btn.classList.remove('active');
+    updateDot(rk, col, 'unsaved');
+    document.getElementById(`corr-${rk}-${col}`)?.classList.remove('visible');
+    saveToBackend(nid, rk); return;
+  }
+
+  state.annotations[nid][rk][col] = { ...ex, correct: verdict, corrected_value: ex.corrected_value||'', comment: ex.comment||'' };
+  document.getElementById(`cell-${rk}-${col}`)?.querySelectorAll('.ann-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`corr-${rk}-${col}`)?.classList.toggle('visible', verdict === false);
+  updateDot(rk, col, verdict === true ? 'ok' : verdict === false ? 'issue' : 'skipped');
+  saveToBackend(nid, rk); updateRowCardStatus(nid, rk); updateProgressBar();
+}
+
+function saveCorrectedValue(nid, rk, col, val) {
+  if (state.annotations[nid]?.[rk]?.[col]) { state.annotations[nid][rk][col].corrected_value = val; saveToBackend(nid, rk); }
+}
+function saveComment(nid, rk, col, val) {
+  if (state.annotations[nid]?.[rk]?.[col]) { state.annotations[nid][rk][col].comment = val; saveToBackend(nid, rk); }
+}
+
+function markAllFields(nid, rk, correct) {
+  if (!state.annotations[nid]) state.annotations[nid] = {};
+  if (!state.annotations[nid][rk]) state.annotations[nid][rk] = {};
+  const row = state.rows.find((r, i) => rowKey(r, i) === rk);
+  if (!row) return;
+  state.columns.forEach(col => {
+    const val = row[col];
+    if (!val || val === '' || val === 'nan') return;
+    state.annotations[nid][rk][col] = { correct, corrected_value: '', comment: '' };
+    updateDot(rk, col, correct ? 'ok' : 'issue');
+    const cell = document.getElementById(`cell-${rk}-${col}`);
+    if (cell) {
+      cell.querySelectorAll('.ann-btn').forEach(b => b.classList.remove('active'));
+      cell.querySelector(`.ann-btn.${correct?'correct':'incorrect'}`)?.classList.add('active');
+      document.getElementById(`corr-${rk}-${col}`)?.classList.toggle('visible', !correct);
+    }
+  });
+  saveToBackend(nid, rk); updateRowCardStatus(nid, rk); updateProgressBar(); showSavedIndicator(rk);
+}
+
+function updateDot(rk, col, cls) {
+  const d = document.getElementById(`dot-${rk}-${col}`);
+  if (d) d.className = `field-saved-dot ${cls}`;
+}
+function updateRowCardStatus(nid, rk) {
+  const card = document.getElementById(`card-${rk}`); if (!card) return;
+  const ra = state.annotations[nid]?.[rk] || {};
+  card.classList.toggle('annotated-ok', isRowAnnotated(ra) && !hasIssues(ra));
+  card.classList.toggle('annotated-issues', hasIssues(ra));
+  const icon = card.querySelector('.row-status-icon');
+  if (icon) icon.textContent = hasIssues(ra) ? '⚠️' : isRowAnnotated(ra) ? '✅' : '';
+}
+
+// ═══════════════════════════════════════════
+//  SAVE
+// ═══════════════════════════════════════════
+const saveTimers = {};
+function saveToBackend(nid, rk) {
+  clearTimeout(saveTimers[rk]);
+  saveTimers[rk] = setTimeout(async () => {
+    try {
+      await fetch(`/api/annotations/${encodeURIComponent(nid)}/row`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ row_key: rk, annotation: state.annotations[nid]?.[rk] || {} })
+      });
+      showSavedIndicator(rk);
+      await loadProgress(); renderFileTabs();
+    } catch(e) { toast('Save failed', 'error'); }
+  }, 600);
+}
+function showSavedIndicator(rk) {
+  const el = document.getElementById(`saved-${rk}`); if (!el) return;
+  el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════
+//  PROGRESS
+// ═══════════════════════════════════════════
+async function loadProgress() {
+  try { state.progress = await fetch('/api/progress').then(r => r.json()); } catch(e) {}
+}
+function updateProgressBar() {
+  const nid = state.currentNoteId; if (!nid) return;
+  const anns = state.annotations[nid] || {};
+  const done = state.rows.filter((r, i) => { const ra = anns[rowKey(r,i)]; return ra && isRowAnnotated(ra); }).length;
+  const pct = state.rows.length > 0 ? Math.round(done / state.rows.length * 100) : 0;
+  document.getElementById('top-progress').style.display = 'flex';
+  document.getElementById('progress-text').textContent = `${done} / ${state.rows.length}`;
+  document.getElementById('top-progress-bar').style.width = pct + '%';
+}
+
+// ═══════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════
+async function exportAnnotations() {
+  try {
+    const r = await fetch('/api/export');
+    if (!r.ok) { toast('No annotations to export yet', 'error'); return; }
+    const url = URL.createObjectURL(await r.blob());
+    Object.assign(document.createElement('a'), { href: url, download: 'annotations_export.csv' }).click();
+    URL.revokeObjectURL(url); toast('Exported ✓', 'success');
+  } catch(e) { toast('Export failed', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+//  KEYBOARD + MODAL
+// ═══════════════════════════════════════════
+function openShortcuts()  { document.getElementById('shortcut-modal').classList.add('open'); }
+function closeShortcuts() { document.getElementById('shortcut-modal').classList.remove('open'); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeShortcuts();
+  if (!e.target.matches('input, textarea')) {
+    if (e.key === 'ArrowRight') navigateFile(1);
+    if (e.key === 'ArrowLeft')  navigateFile(-1);
+  }
+  if (e.ctrlKey && e.key === 'e') { e.preventDefault(); exportAnnotations(); }
+});
+function navigateFile(dir) {
+  const names = state.files.map(f => f.name);
+  const next = names[names.indexOf(state.currentFile) + dir];
+  if (next) { document.getElementById('file-select').value = next; loadFile(next); }
+}
+
+// ═══════════════════════════════════════════
+//  TOASTS
+// ═══════════════════════════════════════════
+function toast(message, type='info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.remove();
+  }, 2500);
+}
+
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
